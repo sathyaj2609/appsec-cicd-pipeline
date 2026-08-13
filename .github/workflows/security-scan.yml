@@ -67,10 +67,47 @@ jobs:
             reports/sbom.json
             reports/grype.json
 
+  dast:
+    name: DAST (OWASP ZAP baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.9 (matches demo app pinned deps)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Start demo app
+        run: |
+          pip install -r demo-app/requirements.txt
+          nohup python demo-app/app.py > app.log 2>&1 &
+          for i in $(seq 1 20); do
+            curl -s http://localhost:5000/health && break
+            sleep 1
+          done
+          curl -sf http://localhost:5000/health
+
+      - name: Run ZAP baseline scan
+        run: |
+          mkdir -p reports && chmod 777 reports
+          docker run --network=host -v $(pwd)/reports:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://localhost:5000 \
+            -J zap.json -w zap.md || true
+
+      - name: Upload DAST findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-findings
+          path: |
+            reports/zap.json
+            reports/zap.md
+
   gate:
     name: Security Policy Gate
     runs-on: ubuntu-latest
-    needs: [sast, sbom]
+    needs: [sast, sbom, dast]
     steps:
       - uses: actions/checkout@v4
 
@@ -95,4 +132,3 @@ jobs:
             reports/findings.json
             reports/report.html
 
-  # Day 5 will add: dast (OWASP ZAP baseline against demo-app)
