@@ -1,0 +1,16 @@
+# Security gate policy — consumed by orchestrator/gate.py (Day 4)
+# The build fails when thresholds are exceeded.
+
+fail_on:
+  critical: 1   # any critical finding fails the build
+  high: 5       # more than 5 highs fails the build
+  medium: 20
+
+ignore:
+  # Findings can be suppressed by rule id, with a required reason.
+  # - id: python.lang.security.audit.debug-enabled
+  #   reason: "demo app only, tracked in issue #12"
+
+report:
+  formats: [json, html]
+  output_dir: reports/

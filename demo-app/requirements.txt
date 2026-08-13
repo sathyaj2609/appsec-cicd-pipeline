@@ -1,0 +1,6 @@
+# FLAW 6: intentionally pinned old versions with known CVEs
+# so Grype has real findings to report.
+flask==2.0.1
+werkzeug==2.0.1
+requests==2.25.1
+pyyaml==5.3.1

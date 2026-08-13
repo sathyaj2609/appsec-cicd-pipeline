@@ -1,0 +1,53 @@
+rules:
+  - id: sqli-string-concat
+    languages: [python]
+    severity: ERROR
+    message: Possible SQL injection - user input concatenated into SQL query
+    metadata:
+      category: security
+      owasp: "A03:2021 Injection"
+    patterns:
+      - pattern-either:
+          - pattern: $CONN.execute("..." + $X + "...")
+          - pattern: $CONN.execute("..." + $X)
+          - pattern: |
+              $Q = "..." + $X + "..."
+              ...
+              $CONN.execute($Q)
+
+  - id: flask-debug-enabled
+    languages: [python]
+    severity: WARNING
+    message: Flask debug mode enabled - exposes Werkzeug debugger RCE in production
+    metadata:
+      category: security
+    pattern: $APP.run(..., debug=True, ...)
+
+  - id: weak-hash-md5-password
+    languages: [python]
+    severity: ERROR
+    message: MD5 used for password hashing - use bcrypt/argon2 instead
+    metadata:
+      category: security
+      owasp: "A02:2021 Cryptographic Failures"
+    pattern: hashlib.md5(...)
+
+  - id: hardcoded-secret-key
+    languages: [python]
+    severity: ERROR
+    message: Hardcoded secret detected - move to environment variable or secret store
+    metadata:
+      category: security
+    patterns:
+      - pattern-either:
+          - pattern: $APP.secret_key = "..."
+          - pattern: API_TOKEN = "..."
+
+  - id: xss-render-template-string-concat
+    languages: [python]
+    severity: ERROR
+    message: Possible reflected XSS - request data concatenated into rendered template
+    metadata:
+      category: security
+      owasp: "A03:2021 Injection"
+    pattern: flask.render_template_string("..." + $X + "...")
