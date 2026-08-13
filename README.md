@@ -25,6 +25,7 @@ How it works
               • exit 1 → build fails on violation
 ```
 Latest pipeline result (real run)
+![Security report](report-screenshot.png)
 ```
 [gate] grype.json:   16 findings     (known CVEs in pinned dependencies)
 [gate] semgrep.json: 27 findings     (SAST: injection, secrets, crypto)
