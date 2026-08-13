@@ -1,0 +1,98 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/default
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+        continue-on-error: true
+
+      - name: Run Semgrep (JSON output for orchestrator)
+        run: |
+          pip install semgrep
+          mkdir -p reports
+          semgrep scan \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/owasp-top-ten \
+            --config semgrep-rules/custom.yml \
+            --json --output reports/semgrep.json || true
+
+      - name: Upload SAST findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-findings
+          path: reports/semgrep.json
+
+  sbom:
+    name: SBOM + Dependency Vulns (Syft/Grype)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Syft & Grype
+        run: |
+          curl -sL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          curl -sL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          mkdir -p reports
+          syft dir:demo-app -o cyclonedx-json=reports/sbom.json
+
+      - name: Scan SBOM for known CVEs
+        run: grype sbom:reports/sbom.json -o json --file reports/grype.json || true
+
+      - name: Upload SBOM + vuln findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-findings
+          path: |
+            reports/sbom.json
+            reports/grype.json
+
+  gate:
+    name: Security Policy Gate
+    runs-on: ubuntu-latest
+    needs: [sast, sbom]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all findings
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+          merge-multiple: true
+
+      - name: Install gate dependencies
+        run: pip install pyyaml
+
+      - name: Run policy gate
+        run: python orchestrator/gate.py --policy security-policy.yml --reports reports/
+
+      - name: Upload consolidated report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: |
+            reports/findings.json
+            reports/report.html
+
+  # Day 5 will add: dast (OWASP ZAP baseline against demo-app)
